@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build binaries
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=${{ github.ref_name }}" -o mcrelay-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-X main.version=${{ github.ref_name }}" -o mcrelay-linux-arm64 .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mcrelay-linux-amd64
+            mcrelay-linux-arm64
