@@ -37,26 +37,55 @@ go build -o mcrelay .
 
 Pre-built binaries for `linux/amd64` and `linux/arm64` are available on the [Releases](../../releases) page.
 
-## Usage
+## Deployment
 
-```bash
-sudo ./mcrelay \
+### systemd (Linux hosts)
+
+Copy the binary to `/usr/local/bin/mcrelay`, then create `/etc/systemd/system/mcrelay.service`:
+
+```ini
+[Unit]
+Description=mcrelay multicast relay
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/mcrelay \
   -interfaces eth0.10,eth0.20 \
   -services mdns,ssdp \
   -families 4,6 \
-  -cache-ms 1500
+  -cache-ms 1500 \
+  -quiet
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Flags:
+```bash
+systemctl daemon-reload
+systemctl enable --now mcrelay
+```
 
-- `-interfaces` comma-separated interfaces (required, at least 2)
-- `-services` `mdns,ssdp,chromecast,googlecast` (default `mdns,ssdp`)
-- `-families` `4,6` (default both)
-- `-cache-ms` duplicate suppression window in milliseconds (default `1500`)
-- `-bufsize` read buffer size (default `65535`)
-- `-quiet` reduce per-packet logs
+### Docker Compose
 
-## UDMP on-boot example
+mcrelay must join multicast groups on host interfaces, so `network_mode: host` is required.
+
+```yaml
+services:
+  mcrelay:
+    image: ghcr.io/Quxyzzy/mcrelay:latest
+    network_mode: host
+    command:
+      - -interfaces=eth0.10,eth0.20
+      - -services=mdns,ssdp
+      - -families=4,6
+      - -cache-ms=1500
+      - -quiet
+    restart: unless-stopped
+```
+
+### UniFi Dream Machine (on-boot)
 
 ```sh
 #!/bin/sh
@@ -69,6 +98,15 @@ sleep 15
   -quiet \
   >> /var/log/mcrelay.log 2>&1 &
 ```
+
+## Flags
+
+- `-interfaces` comma-separated interfaces (required, at least 2)
+- `-services` `mdns,ssdp,chromecast,googlecast` (default `mdns,ssdp`)
+- `-families` `4,6` (default both)
+- `-cache-ms` duplicate suppression window in milliseconds (default `1500`)
+- `-bufsize` read buffer size (default `65535`)
+- `-quiet` reduce per-packet logs
 
 ## Notes
 
